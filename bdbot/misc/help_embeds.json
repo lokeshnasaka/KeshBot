@@ -68,6 +68,7 @@
     "fields": [
       {"name":"What is this bot?", "value":"This bot is a helper to keep up with your favorite comics! It search each hour more than 40+ pages to fetch the most up to date comics for your eyes only!"},
       {"name":"Why can I only go up to 14 comics in the past for Gocomics comics?","value":"As of April 1st 2025, Gocomics implemented a premium membership to view older comics. You can go on their site to get one and see the comics directly in your browser."},
+      {"name":"Why can't I see the comics coming from Gocomics?","value":"As of October 6th 2025, Gocomics implemented a firewall to stop automated content grabber. It is not clear if it is because of AI crawlers or this bot, but this prevent this bot from getting the comic. I am trying to resolve the issue. For now, it will be only previews and 'latest' comics are sent as reminders to go check it out on their website every day at 8 AM UTC."},
       {"name":"How can I support the project?", "value":"You can vote for the bot on top.gg or star the project on GitHub. If you want to support one of the comics that are presented through this bot, go on  their page to see how to support them directly!"},
       {"name":"How can I request comics?", "value":"You can use `/request` to request comics or features directly to the developer."},
       {"name":"How can I receive scheduled comics?","value":"You can use `/help schedule` to get help on how to schedule comics."},
