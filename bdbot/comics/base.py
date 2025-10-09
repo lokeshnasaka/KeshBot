@@ -156,7 +156,7 @@ class BaseComic(ABC):
         return d
 
     def extract_meta_content(
-        self, soup: BeautifulSoup, content_name: str
+        self, soup: BeautifulSoup, content_name: str, date: datetime | None = None
     ) -> str | None:
         """Extract the content from the source
 
@@ -256,8 +256,6 @@ class BaseDateComic(BaseComic):
         comic_date: datetime | None = None,
         link_cache: dict[str, str] = None,
     ) -> ComicDetail:
-        from bdbot.cache import check_if_latest_link
-
         logger = logging.getLogger("discord")
         logger.debug(f"Getting details for comic {self.name}...")
 
@@ -269,7 +267,9 @@ class BaseDateComic(BaseComic):
             logger.debug("No comic date provided, using current date")
             comic_date = get_now()
         original_date = comic_date
-        while tries < self._MAX_TRIES and detail.image_url == self.image:
+        while tries < self._MAX_TRIES and self.is_incomplete(
+            detail, comic_date, action, tries
+        ):
             tries += 1
             detail.date = comic_date
             detail.url = (
@@ -277,6 +277,12 @@ class BaseDateComic(BaseComic):
                 if action == Action.Random
                 else self.get_link_from_date(comic_date)
             )
+            logger.debug(f"Current url is : {detail.url}")
+            try:
+                comic_date = self.extract_date_from_url(detail.url)
+            except ValueError:
+                logger.debug(f"Could not extract date from url {detail.url}")
+            logger.debug(f"Current comic date is : {comic_date}")
 
             # Get the html of the comic site
             logger.debug(f"Retrieving image from {detail.url}...")
@@ -301,7 +307,7 @@ class BaseDateComic(BaseComic):
             logger.debug(f"Image url is {image_url}...")
             detail.image_url = clean_url(image_url)
             # Extracts the title of the comic
-            detail.title = self.extract_meta_content(soup, "title")
+            detail.title = self.extract_meta_content(soup, "title", comic_date)
             # Finds the final url (if necessary)
             url = self.extract_meta_content(soup, "url")
             if url:
@@ -310,16 +316,13 @@ class BaseDateComic(BaseComic):
                 detail.date = self.extract_date_from_url(detail.url)
             except ValueError:
                 detail.date = None
-            if detail.date is None or (
-                detail.date.date() != comic_date.date() and action != Action.Random
-            ):
+            if self.is_incomplete(detail, comic_date, action, tries):
                 # Giving a date with no comic available gives back an older comic, so we back up one day
                 logger.debug(
                     f"The comic found for '{self.name}' has an invalid date, backing up one day"
                     f" (probably a Comics Kingdom comic with no available comic for the current date...)"
                 )
                 comic_date = comic_date - timedelta(days=1)
-                tries += 1
                 if tries >= self._MAX_TRIES:
                     # If it hasn't found anything
                     raise ComicNotFound(
@@ -331,11 +334,27 @@ class BaseDateComic(BaseComic):
                 continue
 
         if verify_latest:
-            detail.is_latest = check_if_latest_link(
+            detail.is_latest = self.check_if_latest_link(
                 detail.name, detail.image_url, link_cache
             )
         logger.debug(f"All done for {self.name}")
         return detail
+
+    def check_if_latest_link(
+        self, name: str, image_url: str, link_cache: dict[str, str]
+    ) -> bool:
+        from bdbot.cache import check_if_latest_link
+
+        return check_if_latest_link(name, image_url, link_cache)
+
+    def is_incomplete(
+        self, detail: ComicDetail, comic_date: datetime, action: Action, num_tries: int
+    ) -> bool:
+        return (
+            detail.date is None
+            or (detail.date.date() != comic_date.date() and action != Action.Random)
+            or detail.image_url == self.image
+        )
 
     def extract_date_from_url(self, url: str) -> datetime:
         return datetime.strptime(

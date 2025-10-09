@@ -5,7 +5,10 @@ from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
 from requests_html import HTML, AsyncHTMLSession
 
+from bdbot.actions import Action
 from bdbot.comics.base import BaseDateComic, WorkingType
+from bdbot.comics.comic_detail import ComicDetail
+from bdbot.time import get_now
 
 SECTION_IMAGE_CLASS = re.compile("ShowComicViewer_showComicViewer__[a-zA-Z0-9]+")
 IMAGE_CLASS_REGEX = re.compile("Comic_comic__image__[a-zA-Z0-9]+_[a-zA-Z0-9]+.*")
@@ -36,13 +39,16 @@ class Gocomics(BaseDateComic):
         return self.website_url + date.strftime(self.url_date_format)
 
     def extract_meta_content(
-        self, soup: BeautifulSoup, content_name: str
+        self, soup: BeautifulSoup, content_name: str, date: datetime | None = None
     ) -> str | None:
         if content_name == "image":
-            return self.extract_image(soup)
+            return self.fallback_image  # self.extract_image(soup)
         elif content_name == "url":
             return None
-        return super().extract_meta_content(soup, content_name)
+            # return super().extract_meta_content(soup, content_name)
+        elif content_name == "title":
+            return f"{self.name} by {self.author} for {date.strftime(f'%B %d, %Y')} | Gocomics"
+        return None
 
     def extract_image(self, soup: BeautifulSoup) -> str | None:
         """Extract the image from Gocomics
@@ -59,6 +65,7 @@ class Gocomics(BaseDateComic):
         return image["src"]
 
     async def read_url_content(self, url: str) -> str:
+        return ""  # Stop pinging Gocomics while I search for a solution
         content = await super().read_url_content(url)
 
         if content == "":
@@ -83,3 +90,15 @@ class Gocomics(BaseDateComic):
         html.session.close()  # A new sync session has been created by arender so we have to close that one
         await session.close()  # And that one too
         return html.html
+
+    def check_if_latest_link(
+        self, name: str, image_url: str, link_cache: dict[str, str]
+    ) -> bool:
+        # Gocomics release their comics every day between 7-8 AM UTC
+        return get_now().hour == 8
+
+    def is_incomplete(
+        self, detail: ComicDetail, comic_date: datetime, action: Action, tries: int
+    ) -> bool:
+        # Forcing at least one loop, after I let it slide because I already have all the information
+        return tries <= 0
