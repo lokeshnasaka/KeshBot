@@ -10,7 +10,7 @@ requires-python = ">=3.11"
 dependencies = [
     "discord.py>=2.6.4",
     "requests>=2.32.3",
-    "requests-htmlc>=0.0.8",
+    "aiohttp>=3.9.0",
     "rss-parser>=2.1.1",
     "beautifulsoup4>=4.12.3",
     "python-dotenv>=1.1.1",

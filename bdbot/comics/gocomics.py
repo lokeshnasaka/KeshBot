@@ -3,16 +3,11 @@ import re
 from datetime import datetime, timedelta
 
 from bs4 import BeautifulSoup
-from requests_html import HTML, AsyncHTMLSession
 
-from bdbot.actions import Action
 from bdbot.comics.base import BaseDateComic, WorkingType
-from bdbot.comics.comic_detail import ComicDetail
-from bdbot.time import get_now
 
 SECTION_IMAGE_CLASS = re.compile("ShowComicViewer_showComicViewer__[a-zA-Z0-9]+")
 IMAGE_CLASS_REGEX = re.compile("Comic_comic__image__[a-zA-Z0-9]+_[a-zA-Z0-9]+.*")
-LOADING_CLASS_REGEX = re.compile("LoadingDots_loadingDotsContainer__[a-zA-Z0-9]+.*")
 
 
 class Gocomics(BaseDateComic):
@@ -42,12 +37,25 @@ class Gocomics(BaseDateComic):
         self, soup: BeautifulSoup, content_name: str, date: datetime | None = None
     ) -> str | None:
         if content_name == "image":
-            return self.fallback_image  # self.extract_image(soup)
+            # Try og:image meta tag first (server-side rendered by Next.js)
+            image_url = super().extract_meta_content(soup, content_name)
+
+            # Fall back to extracting from the comic viewer DOM
+            if image_url is None:
+                image_url = self.extract_image(soup)
+
+            # Last resort: fallback avatar so the embed still posts with a link
+            if image_url is None:
+                return self.fallback_image
+
+            return image_url
+
         elif content_name == "url":
-            return None
-            # return super().extract_meta_content(soup, content_name)
+            return super().extract_meta_content(soup, content_name)
+
         elif content_name == "title":
-            return f"{self.name} by {self.author} for {date.strftime(f'%B %d, %Y')} | Gocomics"
+            return f"{self.name} by {self.author} for {date.strftime('%B %d, %Y')} | Gocomics"
+
         return None
 
     def extract_image(self, soup: BeautifulSoup) -> str | None:
@@ -63,42 +71,3 @@ class Gocomics(BaseDateComic):
         if image is None:
             return None
         return image["src"]
-
-    async def read_url_content(self, url: str) -> str:
-        return ""  # Stop pinging Gocomics while I search for a solution
-        content = await super().read_url_content(url)
-
-        if content == "":
-            return content
-
-        if os.getenv("BYPASS_GOCOMICS_JS") != "True":
-            return content
-
-        soup = BeautifulSoup(content, self._BASE_PARSER)
-        loading = soup.find("div", attrs={"class": LOADING_CLASS_REGEX})
-        if loading is None:
-            return content
-
-        session = AsyncHTMLSession()
-        html = HTML(
-            session=session,
-            url=url,
-            html=content,
-            async_=True,
-        )
-        await html.arender(sleep=1)
-        html.session.close()  # A new sync session has been created by arender so we have to close that one
-        await session.close()  # And that one too
-        return html.html
-
-    def check_if_latest_link(
-        self, name: str, image_url: str, link_cache: dict[str, str]
-    ) -> bool:
-        # Gocomics release their comics every day between 7-8 AM UTC
-        return get_now().hour == 8
-
-    def is_incomplete(
-        self, detail: ComicDetail, comic_date: datetime, action: Action, tries: int
-    ) -> bool:
-        # Forcing at least one loop, after I let it slide because I already have all the information
-        return tries <= 0
