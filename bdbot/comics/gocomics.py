@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
 
 from bdbot.comics.base import BaseDateComic, WorkingType
+from bdbot.comics.browser import get_fetcher
 
 SECTION_IMAGE_CLASS = re.compile("ShowComicViewer_showComicViewer__[a-zA-Z0-9]+")
 IMAGE_CLASS_REGEX = re.compile("Comic_comic__image__[a-zA-Z0-9]+_[a-zA-Z0-9]+.*")
@@ -32,6 +33,11 @@ class Gocomics(BaseDateComic):
 
     def get_link_from_date(self, date: datetime):
         return self.website_url + date.strftime(self.url_date_format)
+
+    async def read_url_content(self, url: str) -> str:
+        # Gocomics pages are behind Bunny Shield, so they are fetched through a headless browser
+        status, content = await get_fetcher(self.WEBSITE_URL).fetch(url)
+        return content if status == 200 else ""
 
     def extract_meta_content(
         self, soup: BeautifulSoup, content_name: str, date: datetime | None = None

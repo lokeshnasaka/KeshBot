@@ -9,6 +9,7 @@ from tortoise.connection import connections
 
 from bdbot.cache import create_link_cache, fill_cache
 from bdbot.comics import initialize_comics
+from bdbot.comics.browser import close_all as close_browsers
 from bdbot.db import dbinit
 from bdbot.discord_ import discord_utils
 from bdbot.discord_.client import BDBotClient
@@ -111,6 +112,7 @@ async def run(bot: commands.Bot, logger: logging.Logger):
             await bot.start(os.getenv("TOKEN"))
     finally:
         await connections.close_all()
+        await close_browsers()
 
 
 if __name__ == "__main__":
