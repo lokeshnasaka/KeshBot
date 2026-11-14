@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.keshbot.dailycomics</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/lokeshnasaka/Documents/git/KeshBot/.venv/bin/python</string>
+        <string>/Users/lokeshnasaka/Documents/git/KeshBot/daily/keshbot_daily.py</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/lokeshnasaka/Documents/git/KeshBot</string>
+
+    <!-- Run every day at 07:00 local time. Change Hour/Minute to reschedule. -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>7</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <!-- If the Mac was asleep at 07:00 and not woken, launchd runs the job at
+         the next wake. Pair this with the `pmset` self-wake in README.md so the
+         Mac wakes itself at 06:55 and posts on time. -->
+
+    <key>StandardOutPath</key>
+    <string>/Users/lokeshnasaka/Documents/git/KeshBot/daily/keshbot_daily.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/lokeshnasaka/Documents/git/KeshBot/daily/keshbot_daily.log</string>
+
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>
