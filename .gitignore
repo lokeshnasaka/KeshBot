@@ -156,3 +156,4 @@ data/
 *.pid
 *.sqlite3
 latest_comics.json
+CLAUDE.md
