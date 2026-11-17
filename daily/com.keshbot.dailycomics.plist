@@ -6,7 +6,10 @@
     <string>com.keshbot.dailycomics</string>
 
     <key>ProgramArguments</key>
+    <!-- caffeinate keeps the Mac awake while the job runs, even during a brief background wake -->
     <array>
+        <string>/usr/bin/caffeinate</string>
+        <string>-is</string>
         <string>/Users/lokeshnasaka/Documents/git/KeshBot/.venv/bin/python</string>
         <string>/Users/lokeshnasaka/Documents/git/KeshBot/daily/keshbot_daily.py</string>
     </array>
@@ -14,14 +17,29 @@
     <key>WorkingDirectory</key>
     <string>/Users/lokeshnasaka/Documents/git/KeshBot</string>
 
-    <!-- Run every day at 07:00 local time. Change Hour/Minute to reschedule. -->
+    <!-- Run every day at 07:00 local time, with backup runs at 07:30 and 08:00 in case
+         the first one fails. Already-posted strips are skipped (.last_posted.json). -->
     <key>StartCalendarInterval</key>
-    <dict>
-        <key>Hour</key>
-        <integer>7</integer>
-        <key>Minute</key>
-        <integer>0</integer>
-    </dict>
+    <array>
+        <dict>
+            <key>Hour</key>
+            <integer>7</integer>
+            <key>Minute</key>
+            <integer>0</integer>
+        </dict>
+        <dict>
+            <key>Hour</key>
+            <integer>7</integer>
+            <key>Minute</key>
+            <integer>30</integer>
+        </dict>
+        <dict>
+            <key>Hour</key>
+            <integer>8</integer>
+            <key>Minute</key>
+            <integer>0</integer>
+        </dict>
+    </array>
 
     <!-- If the Mac was asleep at 07:00 and not woken, launchd runs the job at
          the next wake. Pair this with the `pmset` self-wake in README.md so the

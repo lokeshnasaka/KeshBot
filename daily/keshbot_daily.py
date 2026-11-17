@@ -22,6 +22,7 @@ import json
 import mimetypes
 import os
 import sys
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -55,6 +56,11 @@ REAL_IMAGE_MARKER = "featureassets.gocomics.com/assets/"
 
 # How many days back to look for the most recent available strip.
 LOOKBACK_DAYS = 5
+
+# Headless browser retries: a run during a brief background wake can hit a slow network
+FETCH_ATTEMPTS = 3
+RETRY_DELAY_SECONDS = 20
+PAGE_TIMEOUT_MS = 30_000
 
 EMBED_COLOR = 0xF6C700  # comic-strip yellow
 
@@ -108,14 +114,21 @@ class GoComicsBrowser:
         from playwright.sync_api import sync_playwright
 
         self._pw = sync_playwright().start()
-        self._browser = self._pw.chromium.launch(
-            headless=True, channel="chromium", args=["--headless=new"]
-        )
-        probe = self._browser.new_page()
-        user_agent = probe.evaluate("navigator.userAgent").replace("HeadlessChrome", "Chrome")
-        probe.close()
-        self._page = self._browser.new_context(user_agent=user_agent).new_page()
-        self._page.goto("https://www.gocomics.com/", wait_until="domcontentloaded", timeout=60_000)
+        self._browser = None
+        try:
+            self._browser = self._pw.chromium.launch(
+                headless=True, channel="chromium", args=["--headless=new"]
+            )
+            probe = self._browser.new_page()
+            user_agent = probe.evaluate("navigator.userAgent").replace("HeadlessChrome", "Chrome")
+            probe.close()
+            self._page = self._browser.new_context(user_agent=user_agent).new_page()
+            self._page.goto(
+                "https://www.gocomics.com/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT_MS
+            )
+        except Exception:
+            self.__exit__()
+            raise
         return self
 
     def get(self, url: str) -> tuple[int, str]:
@@ -128,8 +141,30 @@ class GoComicsBrowser:
         )
 
     def __exit__(self, *exc) -> None:
-        self._browser.close()
+        if self._browser is not None:
+            self._browser.close()
         self._pw.stop()
+
+
+def fetch_strips() -> list[tuple[str, str, str, tuple[str, str, datetime] | None]]:
+    """Find the latest strip for every comic, retrying the whole browser session
+    when it errors or finds nothing (e.g. flaky network during a background wake)."""
+    for attempt in range(1, FETCH_ATTEMPTS + 1):
+        try:
+            with GoComicsBrowser() as browser:
+                strips = []
+                for slug, name, author in COMICS:
+                    log(f"{name}: looking for latest strip...")
+                    strips.append((slug, name, author, find_todays_strip(browser, slug)))
+            if any(found for *_, found in strips):
+                return strips
+            log(f"Attempt {attempt}/{FETCH_ATTEMPTS}: no strips found.")
+        except Exception as exc:
+            strips = [(slug, name, author, None) for slug, name, author in COMICS]
+            log(f"Attempt {attempt}/{FETCH_ATTEMPTS}: headless browser failed: {exc}")
+        if attempt < FETCH_ATTEMPTS:
+            time.sleep(RETRY_DELAY_SECONDS)
+    return strips
 
 
 def find_todays_strip(browser: GoComicsBrowser, slug: str) -> tuple[str, str, datetime] | None:
@@ -223,17 +258,7 @@ def main() -> int:
     posted = 0
     failed = 0
 
-    try:
-        with GoComicsBrowser() as browser:
-            strips = []
-            for slug, name, author in COMICS:
-                log(f"{name}: looking for latest strip...")
-                strips.append((slug, name, author, find_todays_strip(browser, slug)))
-    except Exception as exc:
-        log(f"ERROR: headless browser failed: {exc}")
-        return 1
-
-    for slug, name, author, found in strips:
+    for slug, name, author, found in fetch_strips():
         if not found:
             log(f"  {name}: no strip found (skipping).")
             failed += 1
